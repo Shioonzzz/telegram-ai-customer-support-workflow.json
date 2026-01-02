@@ -1,0 +1,12 @@
+FAQ ID	Question Keywords	Answer	Category	Language	Active	Priority	Notes	
+FAQ-001	opening hours, business hours, operating hours	We are open Monday–Friday from 09:00 to 17:00 WIB, and Saturday from 09:00 to 15:00 WIB. We are closed on Sundays and public holidays.	hours	en	TRUE	high	Main operating hours	
+FAQ-002	payment method, how to pay, payment options	We accept Bank Transfer (BCA, Mandiri), E-wallets (OVO, GoPay, DANA), and Cash on Delivery (COD) in selected areas.	payment	en	TRUE	high		
+FAQ-003	shipping cost, delivery fee, shipping	The shipping cost is calculated automatically at checkout based on your location. Free shipping is available for orders above IDR 500,000.	shipping	en	TRUE	high		
+FAQ-004	return policy, refund, exchange	Products can be returned within 7 days if they are unused, in original packaging, and accompanied by the purchase receipt.	return	en	TRUE	high		
+FAQ-005	order not received, package not arrived	If your order has not arrived beyond the estimated delivery time, please send us your order number so we can assist you further.	order	en	TRUE	medium		
+FAQ-006	order status, track order	You can check your order status through the “My Orders” menu or by sending your order number here.	order	en	TRUE	medium		
+FAQ-007	cancel order, order cancellation	Orders can be canceled as long as they have not been shipped. Please provide your order number for verification.	order	en	TRUE	medium		
+FAQ-008	damaged product, defective item	If you receive a damaged or defective product, please contact us within 48 hours after receiving the item.	complaint	en	TRUE	high		
+FAQ-009	change address, wrong address	Address changes are only possible before the order is shipped. Please contact support immediately with your order number.	order	en	TRUE	medium		
+FAQ-010	customer service, admin, human agent	Please describe your issue. If needed, your message will be forwarded to our support team.	general	en	TRUE	low	Fallback FAQ	
+								
