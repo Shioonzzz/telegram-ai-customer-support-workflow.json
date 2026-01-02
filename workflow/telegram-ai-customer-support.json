@@ -1,0 +1,623 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -48,
+        -176
+      ],
+      "id": "c201378f-5aa0-4034-ac7c-f79e744390ed",
+      "name": "Telegram Trigger",
+      "webhookId": "c0f44a07-bdaf-40ca-ad05-04fa216f3637",
+      "credentials": {
+        "telegramApi": {
+          "id": "-",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Ambil data dari Telegram\nconst message = $input.first().json.message;\n\n// Extract informasi penting\nconst customerData = {\n  chatId: message.chat.id,\n  userId: message.from.id,\n  username: message.from.username || 'No username',\n  firstName: message.from.first_name || 'Unknown',\n  messageText: message.text || '',\n  messageId: message.message_id,\n  timestamp: new Date().toISOString(),\n  dateTime: new Date().toLocaleString('id-ID', { \n    timeZone: 'Asia/Jakarta' \n  })\n};\n\nreturn {\n  json: customerData\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        -176
+      ],
+      "id": "9014c857-f1a2-43b7-a395-304c0ea5dc3c",
+      "name": "Extract Customer Data"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are an AI Customer Support agent responsible for analyzing customer messages.\n\nYour tasks:\n1. Understand the content of the customer message.\n2. Classify the message based on intent, priority, and sentiment.\n3. Determine whether the message needs to be handled by a human agent.\n4. Compose a polite, clear, and professional response in English.\n\nAnalyze the following customer message and return the output in EXACT JSON format as shown below:\n\n{\n  \"intent\": \"complaint | question | refund_request | technical_issue | feedback | greeting\",\n  \"priority\": \"high | medium | low\",\n  \"sentiment\": \"positive | neutral | negative\",\n  \"needsHuman\": true or false,\n  \"reason\": \"a short explanation in English\",\n  \"suggestedReply\": \"an appropriate response to the customer in English\"\n}\n\nImportant rules:\n- Use ONLY one of the provided values for each field.\n- Do NOT add any additional fields.\n- ALL text values MUST be written in English.\n- Do NOT use Indonesian or any other language.\n- The output MUST be valid JSON.\n\nCRITICAL OUTPUT RULES:\n- Output MUST be a single raw JSON object.\n- Do NOT use markdown.\n- Do NOT use ```json or ``` .\n- Do NOT add any text before or after the JSON.\n- Output must start with { and end with } only.\n\nCustomer message:\n{{ $json.messageText }}\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "409c0a89-a8d9-40a8-9013-decd549e549b",
+      "name": "Gemini Classification",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "-",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get response from Gemini node (first item)\nconst geminiResponse = $input.first().json;\n\n// Validate response structure\nif (\n  !geminiResponse.content ||\n  !geminiResponse.content.parts ||\n  !geminiResponse.content.parts[0] ||\n  !geminiResponse.content.parts[0].text\n) {\n  throw new Error('Invalid Gemini response structure');\n}\n\n// Extract text from Gemini\nlet responseText = geminiResponse.content.parts[0].text;\n\n// Clean JSON markdown if present\nresponseText = responseText\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\n// Parse AI-generated JSON\nlet classification;\ntry {\n  classification = JSON.parse(responseText);\n} catch (error) {\n  classification = {\n    intent: \"unknown\",\n    priority: \"medium\",\n    sentiment: \"neutral\",\n    needsHuman: true,\n    reason: \"Failed to process AI response\",\n    suggestedReply: \"Sorry, we are currently experiencing a technical issue. Our team will assist you shortly.\"\n  };\n}\n\n// Get customer data from the previous node\nconst previousData = $('Extract Customer Data').first().json;\n\n// Return MUST be an array\nreturn [\n  {\n    json: {\n      ...previousData,\n      ...classification\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        0
+      ],
+      "id": "a259e5c6-1ac2-475f-886f-dd4d9ef6b10b",
+      "name": "Parse AI Response"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2797903e-66dc-4a6f-b526-43fe3a9ddc6d",
+              "leftValue": "={{ $json.needsHuman }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        0
+      ],
+      "id": "37e87bce-c14f-4313-9581-3124265de0c0",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.userId }}",
+        "text": "={{ $json.suggestedReply }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1168,
+        96
+      ],
+      "id": "008d370c-a80c-45fd-aa56-895845cb52e1",
+      "name": "Auto Reply to Customer",
+      "webhookId": "514e9e5a-38c7-4fd6-b279-a1808e4243cb",
+      "credentials": {
+        "telegramApi": {
+          "id": "-",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "-",
+        "text": "=🚨 MESSAGE REQUIRING ATTENTION\n\n👤 Customer: {{ $json.firstName }} (@{{ $json.username }})\n🆔 User ID: {{ $json.userId }}\n📝 Intent: {{ $json.intent }}\n⚡ Priority: {{ $json.priority }}\n😊 Sentiment: {{ $json.sentiment }}\n\n📨 Message:\n{{ $json.messageText }}\n\n🤔 Reason for Escalation:\n{{ $json.reason }}",
+        "replyMarkup": "inlineKeyboard",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1168,
+        -80
+      ],
+      "id": "a9b3fb60-7e44-4954-a854-01d438d8ad2a",
+      "name": "Send a text message",
+      "webhookId": "4e2b823a-917b-44ee-a441-97b5d992fde7",
+      "credentials": {
+        "telegramApi": {
+          "id": "-",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "-",
+        "text": "=Thank you for your message, {{ $json.result.from.first_name }}!\n\nYour inquiry is currently being reviewed by our support team and will be responded to shortly.\n\n⏱️ Estimated response time: 5–15 minutes\n🎫 Ticket ID: #{{ $json.result.message_id }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1392,
+        -80
+      ],
+      "id": "19ff4c51-5c74-42b5-af05-306c1fb5dce1",
+      "name": "Auto Reply to Customer1",
+      "webhookId": "514e9e5a-38c7-4fd6-b279-a1808e4243cb",
+      "credentials": {
+        "telegramApi": {
+          "id": "-",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1392,
+        96
+      ],
+      "id": "70750545-8d67-4745-8754-09fb1e5d3c5d",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "-",
+          "mode": "list",
+          "cachedResultName": "AI Customer Service Interaction Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/-/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/-/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $('Parse AI Response').item.json.timestamp }}",
+            "Date Time": "={{ $('Parse AI Response').item.json.dateTime }}",
+            "User ID": "={{ $('Parse AI Response').item.json.userId }}",
+            "Username": "={{ $('Parse AI Response').item.json.username }}",
+            "First Name": "={{ $('Parse AI Response').item.json.firstName }}",
+            "Message": "={{ $('Parse AI Response').item.json.messageText }}",
+            "Intent": "={{ $('Parse AI Response').item.json.intent }}",
+            "Priority": "={{ $('Parse AI Response').item.json.priority }}",
+            "Sentiment": "={{ $('Parse AI Response').item.json.sentiment }}",
+            "Needs Human": "={{ $('Parse AI Response').item.json.needsHuman }}",
+            "Action Taken": "={{ $json.needsHuman ? 'Escalated to Human' : 'Auto Reply by AI' }}",
+            "Response": "={{ $('Parse AI Response').item.json.suggestedReply }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date Time",
+              "displayName": "Date Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "User ID",
+              "displayName": "User ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Username",
+              "displayName": "Username",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "First Name",
+              "displayName": "First Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Priority",
+              "displayName": "Priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Sentiment",
+              "displayName": "Sentiment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Needs Human",
+              "displayName": "Needs Human",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Action Taken",
+              "displayName": "Action Taken",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Response",
+              "displayName": "Response",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1600,
+        96
+      ],
+      "id": "f04b3792-2f70-48c6-b9c1-c3e774c64135",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "-",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "-",
+          "mode": "list",
+          "cachedResultName": "AI Customer Service Interaction Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/-/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 16984452,
+          "mode": "list",
+          "cachedResultName": "FAQ Database",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/-/edit#gid=16984452"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        368,
+        -176
+      ],
+      "id": "72b2f6f1-3407-4b69-a172-c132ad86af6e",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "-",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===============================\n// FAQ MATCHING NODE\n// ===============================\n\n// 1. Get customer message\nconst customerData = $('Extract Customer Data').first().json;\nconst customerMessage = (customerData.messageText || '').toLowerCase();\n\n// 2. Get all FAQ rows from Google Sheets\nconst faqRows = $input.all();\n\n// 3. Prepare matching result\nlet matchedFAQ = null;\n\n// 4. Helper: priority weight\nconst priorityWeight = {\n  high: 3,\n  medium: 2,\n  low: 1\n};\n\nlet highestScore = 0;\n\n// 5. Loop through FAQ rows\nfor (const faq of faqRows) {\n  const row = faq.json;\n\n  // Skip inactive FAQs\n  if (\n    row.Active !== true &&\n    row.Active !== 'TRUE' &&\n    row.Active !== 'true'\n  ) {\n    continue;\n  }\n\n  if (!row['Question Keywords'] || !row.Answer) continue;\n\n  const keywords = row['Question Keywords']\n    .toLowerCase()\n    .split(',')\n    .map(k => k.trim())\n    .filter(Boolean);\n\n  // Count keyword matches\n  let matchCount = 0;\n  for (const keyword of keywords) {\n    if (customerMessage.includes(keyword)) {\n      matchCount++;\n    }\n  }\n\n  if (matchCount > 0) {\n    const priority = (row.Priority || 'low').toLowerCase();\n    const score = matchCount * (priorityWeight[priority] || 1);\n\n    if (score > highestScore) {\n      highestScore = score;\n      matchedFAQ = {\n        faqId: row['FAQ ID'],\n        answer: row.Answer,\n        category: row.Category || 'general',\n        priority,\n        language: row.Language || 'en',\n        isFAQ: true\n      };\n    }\n  }\n}\n\n// 6. Return merged result\nreturn [\n  {\n    json: {\n      ...customerData,\n      faqMatch: matchedFAQ,\n      skipAI: matchedFAQ !== null\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        -176
+      ],
+      "id": "88e1be6e-a646-44d9-b5b0-30af94c004ef",
+      "name": "Check FAQ Match"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a25ec7c7-087a-4257-a018-727b23b36058",
+              "leftValue": "={{ $json.skipAI }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        784,
+        -176
+      ],
+      "id": "75023745-1180-44d3-a5f3-395a14564095",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Check FAQ Match').item.json.chatId }}",
+        "text": "={{ $json.faqMatch.answer }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1008,
+        -192
+      ],
+      "id": "5999c187-6d4d-4c31-b9dd-e0b3d80aaec4",
+      "name": "FAQ Quick Reply",
+      "webhookId": "6f634588-53c6-41fb-8f68-4e23f0fa30cd",
+      "credentials": {
+        "telegramApi": {
+          "id": "-",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Customer Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Customer Data": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Classification": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Auto Reply to Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto Reply to Customer": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        [
+          {
+            "node": "Auto Reply to Customer1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto Reply to Customer1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Check FAQ Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check FAQ Match": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "FAQ Quick Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gemini Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d456dd9b0cb3db9de71d68340142186567906a2788314ab205288d40f8579212"
+  }
+}
