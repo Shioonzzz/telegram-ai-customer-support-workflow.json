@@ -69,21 +69,6 @@ Architecture diagrams and workflow screenshots are available in the `docs/` dire
 
 ---
 
-## Repository Structure
-telegram-ai-customer-support/
-├── workflow/
-│ └── telegram-ai-customer-support.json
-├── docs/
-│ ├── flow-diagram.png
-│ └── screenshots/
-├── sample-data/
-│ ├── telegram-message.json
-│ ├── ai-response-sample.json
-│ └── faq-sheet-example.csv
-└── README.md
-
----
-
 ## Disclaimer
 This project is intended for **portfolio and learning purposes**.  
 It demonstrates system design and automation logic rather than a fully production-hardened customer support solution.
