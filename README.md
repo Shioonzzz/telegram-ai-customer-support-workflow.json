@@ -82,9 +82,6 @@ telegram-ai-customer-support/
 │ └── faq-sheet-example.csv
 └── README.md
 
-yaml
-Salin kode
-
 ---
 
 ## Disclaimer
